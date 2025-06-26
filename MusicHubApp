@@ -1,0 +1,13 @@
+MusicHubApp/
+├── app/
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/com/yourdomain/musichub/
+│   │   │   │   ├── MainActivity.kt
+│   │   │   ├── res/
+│   │   │   │   ├── layout/
+│   │   │   │   │   ├── activity_main.xml
+│   │   ├── AndroidManifest.xml
+├── build.gradle (Module level)
+├── settings.gradle
+├── build.gradle (Project level)
