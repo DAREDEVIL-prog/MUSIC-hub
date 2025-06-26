@@ -11,3 +11,416 @@ MusicHubApp/
 ├── build.gradle (Module level)
 ├── settings.gradle
 ├── build.gradle (Project level)
+
+package com.yourdomain.musichub
+
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+
+class MainActivity : AppCompatActivity() {
+   override fun onCreate(savedInstanceState: Bundle?) {
+       super.onCreate(savedInstanceState)
+       setContentView(R.layout.activity_main)
+   }
+}
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <EditText
+        android:id="@+id/searchInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Search for music..." />
+
+    <Button
+        android:id="@+id/searchButton"
+        android:layout_below="@id/searchInput"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Search" />
+
+</RelativeLayout>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.yourdomain.musichub">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="true"
+        android:label="MusicHub"
+        android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+        <activity android:name=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.1'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+include ':app'
+rootProject.name = "MusicHubApp"
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+}
+
+android {
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.yourdomain.musichub"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.0'
+}
+<uses-permission android:name="android.permission.INTERNET" />
+dependencies {
+    implementation 'com.google.android.youtube:youtube-android-player-api:1.2.2'
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+}
+import retrofit2.Call
+import retrofit2.http.GET
+import retrofit2.http.Query
+
+interface YouTubeApiService {
+    @GET("search")
+    fun searchVideos(
+        @Query("part") part: String,
+        @Query("q") query: String,
+        @Query("type") type: String,
+        @Query("key") apiKey: String,
+        @Query("maxResults") maxResults: Int
+    ): Call<YouTubeSearchResponse>
+}
+data class YouTubeSearchResponse(
+    val items: List<YouTubeVideoItem>
+)
+
+data class YouTubeVideoItem(
+    val id: VideoId,
+    val snippet: Snippet
+)
+
+data class VideoId(val videoId: String)
+data class Snippet(val title: String, val thumbnails: Thumbnails)
+data class Thumbnails(val default: Thumbnail)
+data class Thumbnail(val url: String)
+val retrofit = Retrofit.Builder()
+    .baseUrl("https://www.googleapis.com/youtube/v3/")
+    .addConverterFactory(GsonConverterFactory.create())
+    .build()
+
+val api = retrofit.create(YouTubeApiService::class.java)
+
+val searchButton: Button = findViewById(R.id.searchButton)
+val searchInput: EditText = findViewById(R.id.searchInput)
+
+searchButton.setOnClickListener {
+    val query = searchInput.text.toString()
+    val call = api.searchVideos("snippet", query, "video", "YOUR_API_KEY", 5)
+
+    call.enqueue(object : Callback<YouTubeSearchResponse> {
+        override fun onResponse(
+            call: Call<YouTubeSearchResponse>,
+            response: Response<YouTubeSearchResponse>
+        ) {
+            val videoId = response.body()?.items?.firstOrNull()?.id?.videoId
+            if (videoId != null) {
+                val intent = Intent(this@MainActivity, YouTubePlayerActivity::class.java)
+                intent.putExtra("videoId", videoId)
+                startActivity(intent)
+            }
+        }
+
+        override fun onFailure(call: Call<YouTubeSearchResponse>, t: Throwable) {
+            Toast.makeText(this@MainActivity, "Failed: ${t.message}", Toast.LENGTH_SHORT).show()
+        }
+    })
+}
+import android.os.Bundle
+import com.google.android.youtube.player.*
+
+class YouTubePlayerActivity : YouTubeBaseActivity(), YouTubePlayer.OnInitializedListener {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val videoId = intent.getStringExtra("videoId") ?: return
+
+        val playerView = YouTubePlayerView(this)
+        setContentView(playerView)
+        playerView.initialize("AIzaSyDEYvRgMh9_7wcHpEqHWV6-zlnuNhTHRtw", this)
+    }
+
+    override fun onInitializationSuccess(
+        provider: YouTubePlayer.Provider?,
+        player: YouTubePlayer?,
+        wasRestored: Boolean
+    ) {
+        val videoId = intent.getStringExtra("videoId") ?: return
+        if (!wasRestored) {
+            player?.cueVideo(videoId)
+            player?.play()
+        }
+    }
+
+    override fun onInitializationFailure(
+        provider: YouTubePlayer.Provider?,
+        error: YouTubeInitializationResult?
+    ) {
+        Toast.makeText(this, "Error loading player", Toast.LENGTH_SHORT).show()
+    }
+}
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <EditText
+        android:id="@+id/searchInput"
+        android:hint="Search YouTube Music"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <Button
+        android:id="@+id/searchButton"
+        android:text="Search"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/resultsRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+</LinearLayout>
+class YouTubeAdapter(
+    private val videos: List<YouTubeVideoItem>,
+    private val onItemClick: (String) -> Unit
+) : RecyclerView.Adapter<YouTubeAdapter.VideoViewHolder>() {
+
+    class VideoViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val title: TextView = itemView.findViewById(R.id.videoTitle)
+        val thumbnail: ImageView = itemView.findViewById(R.id.videoThumbnail)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VideoViewHolder {
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_video, parent, false)
+        return VideoViewHolder(view)
+    }
+
+    override fun getItemCount() = videos.size
+
+    override fun onBindViewHolder(holder: VideoViewHolder, position: Int) {
+        val video = videos[position]
+        holder.title.text = video.snippet.title
+
+        // Use Glide or Picasso to load thumbnail
+        Glide.with(holder.itemView)
+            .load(video.snippet.thumbnails.default.url)
+            .into(holder.thumbnail)
+
+        holder.itemView.setOnClickListener {
+            onItemClick(video.id.videoId)
+        }
+    }
+}
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:padding="8dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+
+    <ImageView
+        android:id="@+id/videoThumbnail"
+        android:layout_width="120dp"
+        android:layout_height="90dp" />
+
+    <TextView
+        android:id="@+id/videoTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:textSize="16sp"
+        android:textColor="#000"/>
+</LinearLayout>
+class MainActivity : AppCompatActivity() {
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var adapter: YouTubeAdapter
+    private lateinit var api: YouTubeApiService
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        recyclerView = findViewById(R.id.resultsRecyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://www.googleapis.com/youtube/v3/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        api = retrofit.create(YouTubeApiService::class.java)
+
+        findViewById<Button>(R.id.searchButton).setOnClickListener {
+            val query = findViewById<EditText>(R.id.searchInput).text.toString()
+            searchYouTube(query)
+        }
+    }
+
+    private fun searchYouTube(query: String) {
+        val call = api.searchVideos("snippet", query, "video", "YOUR_API_KEY", 10)
+        call.enqueue(object : Callback<YouTubeSearchResponse> {
+            override fun onResponse(call: Call<YouTubeSearchResponse>, response: Response<YouTubeSearchResponse>) {
+                val results = response.body()?.items ?: emptyList()
+                adapter = YouTubeAdapter(results) { videoId ->
+                    val intent = Intent(this@MainActivity, YouTubePlayerActivity::class.java)
+                    intent.putExtra("videoId", videoId)
+                    startActivity(intent)
+                }
+                recyclerView.adapter = adapter
+            }
+
+            override fun onFailure(call: Call<YouTubeSearchResponse>, t: Throwable) {
+                Toast.makeText(this@MainActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+}
+dependencies {
+    implementation "androidx.room:room-runtime:2.6.1"
+    kapt "androidx.room:room-compiler:2.6.1"
+}
+apply plugin: 'kotlin-kapt'
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "favorites")
+data class FavoriteVideo(
+    @PrimaryKey val videoId: String,
+    val title: String
+)
+import androidx.room.*
+
+@Dao
+interface FavoriteDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun addToFavorites(video: FavoriteVideo)
+
+    @Query("SELECT * FROM favorites")
+    suspend fun getAllFavorites(): List<FavoriteVideo>
+
+    @Delete
+    suspend fun remove(video: FavoriteVideo)
+}
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+
+@Database(entities = [FavoriteVideo::class], version = 1)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun favoriteDao(): FavoriteDao
+
+    companion object {
+        private var INSTANCE: AppDatabase? = null
+
+        fun getDatabase(context: Context): AppDatabase {
+            if (INSTANCE == null) {
+                INSTANCE = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "music_db"
+                ).build()
+            }
+            return INSTANCE!!
+        }
+    }
+}
+<ImageButton
+    android:id="@+id/favButton"
+    android:layout_width="40dp"
+    android:layout_height="40dp"
+    android:src="@android:drawable/btn_star_big_off"
+    android:layout_gravity="center_vertical"/>
+val context = holder.itemView.context
+val db = AppDatabase.getDatabase(context)
+val dao = db.favoriteDao()
+
+holder.itemView.findViewById<ImageButton>(R.id.favButton).setOnClickListener {
+    val video = videos[position]
+    CoroutineScope(Dispatchers.IO).launch {
+        dao.addToFavorites(FavoriteVideo(video.id.videoId, video.snippet.title))
+        withContext(Dispatchers.Main) {
+            Toast.makeText(context, "Added to favorites", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+import kotlinx.coroutines.*
+class FavoritesActivity : AppCompatActivity() {
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var db: AppDatabase
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_favorites)
+
+        recyclerView = findViewById(R.id.favRecyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+
+        db = AppDatabase.getDatabase(this)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val list = db.favoriteDao().getAllFavorites()
+            withContext(Dispatchers.Main) {
+                recyclerView.adapter = FavoriteAdapter(list) { videoId ->
+                    val intent = Intent(this@FavoritesActivity, YouTubePlayerActivity::class.java)
+                    intent.putExtra("videoId", videoId)
+                    startActivity(intent)
+                }
+            }
+        }
+    }
+}
+val favButton = Button(this).apply {
+    text = "View Favorites"
+    setOnClickListener {
+        startActivity(Intent(this@MainActivity, FavoritesActivity::class.java))
+    }
+}
+layout.addView(favButton)
